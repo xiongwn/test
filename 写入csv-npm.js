@@ -1,6 +1,6 @@
 const ExcelJS = require('exceljs')
-let table
 
+let table
 
 function initGbkTable() {
   // https://en.wikipedia.org/wiki/GBK_(character_encoding)#Encoding
@@ -158,16 +158,6 @@ var contentRows = [
 ]
 
 sheet.addRows(contentRows);
-
-let saveData = function (blob, fileName) {
-  // 下载
-  var a = document.createElement("a")
-  document.body.appendChild(a)
-  let url = window.URL.createObjectURL(blob)
-  a.href = url
-  a.download = fileName
-  a.click()
-}
 
 workbook.csv.writeBuffer().then((buffer) => {
 
