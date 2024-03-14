@@ -81,8 +81,7 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
             .map(sub => {
                 return sub.filter(n => {
                     return sectionTypeList.slice(s_index).includes(n.sectionType)
-                })
-                    .reduce((pre, next) => pre + next.totalWorkSecond, 0)
+                }).reduce((pre, next) => pre + next.totalWorkSecond, 0)
             })
         // 每个方案的剩余时间
         e.leftTimePlanList = leftTimePlanList
@@ -173,7 +172,6 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
                 second: totalWorkSecond,
                 factory_dept_id: dept.factory_dept_id
             })
-
         }
         // 方案循环结束，根据起止时间选择方案
         let detail = cacheDeptList.sort((pre, next) => pre.endDate.replace(/-/g, "") - next.endDate.replace(/-/g, ""))[0]
