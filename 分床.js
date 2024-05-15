@@ -1,6 +1,11 @@
+// ignoreChange是忽略量体值change
 // 每个衣服的规格有一个字母，如果abc/y状态是合并standardType不同的可以在一床
+// 如果有colorDiff，则不同colorDiff的衣服不能在同一床上
 product.forEach(i => {
     i.standardType = i.standard.match(/[a-z]/ig)[0]
+    if (!ignoreChange) {
+        i.change = null
+    }
     if (i.change) {
         i.changeArr = i.change.split(",").map(e => {
             let code = e.match(/[a-z]+/ig)[0]
@@ -79,7 +84,7 @@ for (let i = 0; i < bedConfig.length; i++) {
     }
     // 按standard+size+change分组
     product.forEach(e => {
-        e.groupUnicId = e.standard + e.size + e.change
+        e.groupUnicId = e.standard + e.size + e.change + (colorDiff ? (e.colorDiff || "") : "")
     })
     // group相同才能放一列
     let groupList = Array.from(new Set(product.map(e => e.groupUnicId)))
@@ -96,6 +101,9 @@ for (let i = 0; i < bedConfig.length; i++) {
         // status是分开的时候sortedGroupList的衣服需要有相同standardType
         if (status === 2) {
             sortedGroupList = sortedGroupList.filter(e => e.some(sub => sub.standardType === sortedGroupList[0][0].standardType))
+        }
+        if (colorDiff) {
+            sortedGroupList = sortedGroupList.filter(e => e.some(sub => sub.colorDiff === sortedGroupList[0][0].colorDiff))
         }
         // -------------------机器------------------
         if (cutType === 1) {

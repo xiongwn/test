@@ -4,7 +4,7 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
     let styleId = measureBodyStyle[i].styleId
     let styleOrigin = measureBodyStyle[i].styleOrigin
 
-    let subStyleIngredient = styleIngredient.filter(sub => sub.styleId === styleId)
+    let subStyleIngredient = styleIngredient.filter(sub => sub.styleId === styleId && sub.origin !== 1)
     
     // 主面料
     let main = style.find(e => e.数据ID === styleId)
@@ -64,6 +64,7 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         // 物料号
         let code = subStyleIngredientCodeArr[j]
         let arr = subStyleIngredient.filter(e => e.code === code)
+        console.log("arr", arr)
         let cCardList = arr.map(e => e.cCard).flat()
         let assistAttributeIdArr = Array.from(new Set(cCardList.map(e => e.assistAttributeId)))
         // 款式配料用量
@@ -77,8 +78,11 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         
         // cCard = cCard.filter(sub => sub.assistAttributeId)
         // console.log("cCard", cCard)
+        console.log("cCardList", cCardList)
         let result = assistAttributeIdArr.map(sub => {
-          let productNum = cCardList.filter(e => (e.assistAttributeId - 0) === (sub - 0)).reduce((pre, next) => pre + next.number, 0)
+          if (sub) {
+            productNum = cCardList.filter(e => (e.assistAttributeId - 0) === (sub - 0)).reduce((pre, next) => pre + next.number, 0)
+          }
           return {
             assistAttributeId: sub,
             size: (assistAttribute.find(e => e.数据ID === sub) || {}).standard,
@@ -101,12 +105,14 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         // 物料号
         let code = subStyleIngredientCodeArr[j]
         let arr = subStyleIngredient.filter(e => e.code === code)
+        console.log("arr", arr)
         // 款式配料用量
         let amount = arr.reduce((pre, next) => pre + next.amount, 0)
         // 单位
         let unit = arr[0].unit
         // 备注
         let description = arr.reduce((pre, next) => pre + next.description, "")
+        let name = arr[0].materialName
         
         materialList.push({
           totalNum,
@@ -119,7 +125,26 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         })
       }
     }
-    measureBodyStyle[i].materialList = materialList
+    // code+size合并同类项
+    let joinMaterialList = []
+    const unicArr = materialList.map(e => e.size + e.code)
+    // console.log("unicArr", unicArr)
+    for (let n = 0; n < unicArr.length; n++) {
+      let c_materialList = materialList.filter(e => e.size + e.code === unicArr[n])
+      const styleIngredientAmount = c_materialList.reduce((pre, next) => pre + next.styleIngredientAmount, 0)
+      c_materialList[0].styleIngredientAmount = styleIngredientAmount
+      joinMaterialList.push(c_materialList[0])
+    }
+    measureBodyStyle[i].materialList = (main.amountList || []).map(e => {
+      // console.log("e", e)
+      let o = {}
+      o.code = e.code
+      o.name = e.materialName
+      o.unit = e.unit
+      o.amount = e.amount
+      o.styleIngredientAmount = e.amount
+      return o
+    }).concat(joinMaterialList)
   }
 }
 return { result: measureBodyStyle }
