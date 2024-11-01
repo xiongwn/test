@@ -12,6 +12,7 @@ function formatDate(c_time) {
     let month = i_date.getMonth() + 1
     let date = i_date.getDate()
     let day = i_date.getDay()
+    // if (day === 0) {day = 7}
     let str = year + "-" + (month.toString().padStart(2, "0")) + "-" + (date.toString().padStart(2, "0"))
     let time = new Date(str).getTime()
     return { year, month, date, day, str, time }
@@ -45,6 +46,7 @@ for (let i = 0; i < packageTask.length; i++) {
     let currentPackageTask = packageTask[i]
     let departmentList = JSON.parse(JSON.stringify(department.filter(sub => sub.path.includes(currentPackageTask.factory_dept_id))))
     let cacheDeptList = []
+    let sectionStartDateObj = currentPackageTask.sectionStartDateObj
     // 按装箱产线循环，看每个产线排完各需要多少天
     for (let j = 0; j < departmentList.length; j++) {
         // 产线
@@ -73,9 +75,10 @@ for (let i = 0; i < packageTask.length; i++) {
         while (left > 0) {
             // 当天生成力，看当天是星期几
             let { day, str } = sectionStartDateObj
-            let deptWorkSecond = deptWorkSecondList[day - 1]
+            // console.log("sectionStartDateObj", sectionStartDateObj)
+            let deptWorkSecond = deptWorkSecondList[day]
             // 当天没产能就往后一天再处理
-            if (deptWorkSecond === 0) {
+            if (!deptWorkSecond) {
                 sectionStartDateObj = formatDate(sectionStartDateObj.time + 86400000)
                 continue
             }
@@ -123,7 +126,9 @@ for (let i = 0; i < packageTask.length; i++) {
     currentPackageTask.planStartDate = cacheDept.startDate
     currentPackageTask.planEndDate = cacheDept.endDate
     currentPackageTask.planWorkDetail = cacheDept.x_detail
+    currentPackageTask.dept_id = cacheDept.dept_id
     scheduledPackageTask.push(currentPackageTask)
 }
 
-return {packageTask}
+console.log(packageTask)
+//return {packageTask}

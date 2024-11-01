@@ -18,6 +18,9 @@ function formatDate(c_time) {
     let month = i_date.getMonth() + 1
     let date = i_date.getDate()
     let day = i_date.getDay()
+    if (day === 0) {
+        day = 7
+    }
     let str = year + "-" + (month.toString().padStart(2, "0")) + "-" + (date.toString().padStart(2, "0"))
     let time = new Date(str).getTime()
     return { year, month, date, day, str, time }
@@ -33,7 +36,7 @@ function deptUsage(dept_id, dateStr) {
 }
 
 // 工段顺序
-let sectionTypeList = ["缝制", "后整理", "水洗记忆"]
+let sectionTypeList = ["缝制", "水洗记忆", "后整理"]
 // 当前日期字符串
 let currentDateStr = formatDate(Date.now()).str
 
@@ -41,14 +44,20 @@ let currentDateStr = formatDate(Date.now()).str
 // department.workHourList [0, 21120, 21120, 21120, 21120, 21120, 21120] 从周日开始的可用分钟数
 department.forEach(e => {
     // 产线workHourList转换成second
-    if (e.type === 1 && e.workSecondList) {
+    if (e.type === 1 && e.workHourList) {
         e.workSecondList = e.workHourList.map(sub => sub * 60)
     }
 })
 
 // 生产订单排程是从缝制开始时间
 productionOrder.forEach(e => {
-    e.sectionStartDateObj = formatDate((new Date(e.materialAvailableDate).getTime() || Date.now()) + 86400000)
+    let existSchedule = schedule.filter(i => i.productionOrderId === e.数据ID).sort((pre, next) => next.actualEndDate - pre.actualEndDate)
+    if (existSchedule.length > 0) {
+        e.sectionStartDateObj = formatDate((new Date(existSchedule[0].actualEndDate).getTime() || Date.now()) + 86400000)
+        e.existSchedule = existSchedule
+    } else {
+        e.sectionStartDateObj = formatDate((new Date(e.materialAvailableDate).getTime() || Date.now()) + 86400000)
+    }
     // e.sectionStartDateObj = formatDate(Date.now() + 86400000)
     // 设置考勤
     e.departmentList = e.departmentList.map(i => {
@@ -69,11 +78,12 @@ productionOrder.forEach(e => {
 
 // 按工段循环
 for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
+    // 当前工段类型
     let currentSectionType = sectionTypeList[s_index]
     let c_productionOrder = productionOrder.filter(e => {
         return e.departmentList.some(sub => {
             return sub.some(n => n.sectionType === currentSectionType)
-        })
+        }) && (!e.existSchedule || !e.existSchedule.some(n => n.sectionType === currentSectionType))
     })
     c_productionOrder.forEach(e => {
         // 每个方案的剩余总时长
@@ -92,6 +102,7 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
     c_productionOrder = c_productionOrder.sort((pre, next) => pre.avarageLeftTime - next.avarageLeftTime)
     for (let i = 0; i < c_productionOrder.length; i++) {
         let currentProductionOrder = c_productionOrder[i]
+        // console.log("currentProductionOrder", currentProductionOrder)
         let departmentList = currentProductionOrder.departmentList
         let sectionStartDateObj = currentProductionOrder.sectionStartDateObj
         let cacheDeptList = []
@@ -99,6 +110,9 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
         for (let j = 0; j < departmentList.length; j++) {
             // 判断该部门是否排过，不同方案的当前工段部门可能相同
             let dept = departmentList[j].find(e => e.sectionType === currentSectionType)
+            dept.group_id = department.find(sub => sub.dept_id === dept.dept_id).group_id
+            const currentAttendanceGroup = attendanceGroup.find(item => item.group_id === dept.group_id)
+            const specialOffDuty = currentAttendanceGroup?.specialOffDuty
             if (cacheDeptList.some(e => e.dept_id === dept.dept_id)) {
                 continue
             }
@@ -127,7 +141,16 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
             while (left > 0) {
                 // 当天生成力，看当天是星期几
                 let { day, str } = sectionStartDateObj
+                // 休息日
+                if (specialOffDuty) {
+                    if (specialOffDuty.some(sub => sub.date === str)) {
+                        sectionStartDateObj = formatDate(sectionStartDateObj.time + 86400000)
+                        continue
+                    }
+                }
                 let deptWorkSecond = deptWorkSecondList[day - 1]
+                // console.log("deptWorkSecondList", deptWorkSecondList)
+                // console.log("sectionStartDateObj", sectionStartDateObj)
                 // 当天没产能就往后一天再处理
                 if (deptWorkSecond === 0) {
                     sectionStartDateObj = formatDate(sectionStartDateObj.time + 86400000)
@@ -136,7 +159,12 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
                 // 当天其他订单的排程
                 let anotherProductionOrder = scheduleDetail.filter(e => e.date === str)
                 // 当天可用时间
+                // console.log("scheduleDetail", scheduleDetail)
+                // console.log("deptWorkSecond", deptWorkSecond)
+                // console.log("anotherProductionOrder.reduce((pre, next) => pre + next.usage, 0)", anotherProductionOrder.reduce((pre, next) => pre + next.usage, 0))
                 let availableTime = deptWorkSecond - anotherProductionOrder.reduce((pre, next) => pre + next.usage, 0)
+                // console.log("availableTime", availableTime)
+                // console.log("left", left)
                 // 当天没可用时间往后一天再处理
                 if (availableTime === 0) {
                     sectionStartDateObj = formatDate(sectionStartDateObj.time + 86400000)
@@ -148,8 +176,8 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
                     left = 0
                 } else {
                     // 当天可用时间不足以处理剩余时，检查有没有跨当前日期的订单如果有，需要删掉x_detail以当天为起点重新开始
-                    if (x_detail.length === 0 ||
-                        anotherProductionOrder.length === 0 ||
+                    if (x_detail.length !== 0 &&
+                        anotherProductionOrder.length !== 0 &&
                         scheduleDetail.some(e => {
                             return e.date === x_detail.slice(-1)[0].str && anotherProductionOrder.some(sub => sub.productionOrderId === e.productionOrderId)
                         })) {
@@ -157,6 +185,7 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
                         left = totalWorkSecond
                     }
                     x_detail.push({ date: str, usage: availableTime })
+                    // console.log("x_detail", x_detail)
                     left -= availableTime
                     sectionStartDateObj = formatDate(sectionStartDateObj.time + 86400000)
                 }
@@ -170,24 +199,33 @@ for (let s_index = 0; s_index < sectionTypeList.length; s_index++) {
                 endDate,
                 x_detail,
                 second: totalWorkSecond,
-                factory_dept_id: dept.factory_dept_id
+                factory_dept_id: dept.factory_dept_id,
+                group_id: dept.group_id
             })
         }
         // 方案循环结束，根据起止时间选择方案
         let detail = cacheDeptList.sort((pre, next) => pre.endDate.replace(/-/g, "") - next.endDate.replace(/-/g, ""))[0]
-        currentProductionOrder.sectionStartDateObj = formatDate(currentProductionOrder.sectionStartDateObj.time + 86400000)
+        // console.log("cacheDeptList", cacheDeptList)
+        currentProductionOrder.sectionStartDateObj = formatDate(new Date(detail.endDate).getTime() + 86400000)
+        // console.log("currentProductionOrder", currentProductionOrder)
         schedule.push({
+            userNum: userList.filter(item => item.dept_id_list.includes(detail.dept_id)).length,
+            attendanceGroup: attendanceGroup.find(item => item.group_id === detail.group_id),
+            sectionType: currentSectionType,
             endDate: detail.endDate,
             startDate: detail.startDate,
             productionOrderId: currentProductionOrder.数据ID,
             orderId: currentProductionOrder.orderId,
             dept_id: detail.dept_id,
             second: detail.second,
+            factory_dept_id: detail.factory_dept_id,
             extra: { detail: detail.x_detail },
             //sectionStartDateObj: currentProductionOrder.sectionStartDateObj
         })
     }
 }
+// console.log("productionOrder", productionOrder)
+// console.log("schedule", schedule)
 productionOrder.forEach(e => {
     let c_schedule = schedule.filter(sub => sub.productionOrderId === e.数据ID)
     e.planStartDate = c_schedule.sort((pre, next) => pre.startDate.replace(/-/g, "") - next.startDate.replace(/-/g, ""))[0].startDate
@@ -201,6 +239,10 @@ productionOrder.forEach(e => {
 // 明天的日期
 let tommorow = formatDate(Date.now() + 86400000).str
 for (let i = 0; i < productionOrder.length; i++) {
+    if (productionOrder[i].existSchedule) {
+        continue
+    }
+    let categoryId = productionOrder[i].style.categoryId
     // 厂区id
     let factory_dept_id = productionOrder[i].cacheSchedule[0].factory_dept_id
     // 该生产订单的算料结果
@@ -219,9 +261,9 @@ for (let i = 0; i < productionOrder.length; i++) {
     let planStartDate = productionOrder[i].planStartDate
 
     // 如果开始时间是明天，则裁剪没法排，处理下一个生产订单
-    if (tommorow === planStartDate) {
-        continue
-    }
+    // if (tommorow === planStartDate) {
+    //     continue
+    // }
     // 不同裁剪产线的临时方案列表
     let cacheDeptList = []
     let cutStartDateObj = formatDate(new Date(planStartDate) - 86400000)
@@ -231,6 +273,11 @@ for (let i = 0; i < productionOrder.length; i++) {
         if (dept.totalWorkSecond >= 0) {
             continue
         }
+        const departmentStyleCategory = dept.departmentStyleCategory.find(sub => sub.categoryId === categoryId)
+        if (!departmentStyleCategory) {
+            continue
+        }
+        let detail_1 = departmentStyleCategory.detail_1
         // 每件裁剪工序用时 = 层数 x 层数单位用时+版长 x 版长单位用时+周长 x 周长单位用时+刀口数 x 刀口单位用时+（转折点数量+裁片数）x 单位起落刀时间
         let left = 0
         for (let k = 0; k < c_materialUsage_list.length; k++) {
@@ -248,15 +295,15 @@ for (let i = 0; i < productionOrder.length; i++) {
             // 裁片数
             let pieceNum = c_materialUsage.pieceNum || 0
             // 层数单位用时
-            let 层数单位用时 = dept.detail_1.层数单位用时 || 0
+            let 层数单位用时 = detail_1.层数单位用时 || 0
             // 版长单位用时
-            let 版长单位用时 = dept.detail_1.版长单位用时 || 0
+            let 版长单位用时 = detail_1.版长单位用时 || 0
             // 周长单位用时
-            let 周长单位用时 = dept.detail_1.周长单位用时 || 0
+            let 周长单位用时 = detail_1.周长单位用时 || 0
             // 刀口单位用时
-            let 刀口单位用时 = dept.detail_1.刀口单位用时 || 0
+            let 刀口单位用时 = detail_1.刀口单位用时 || 0
             // 单位起落刀时间
-            let 单位起落刀时间 = dept.detail_1.单位起落刀时间 || 0
+            let 单位起落刀时间 = detail_1.单位起落刀时间 || 0
             let second = layerNum * 层数单位用时
                 + 版长单位用时 * mMarker_Length
                 + 周长单位用时 * mMarker_Total_Perim
@@ -265,16 +312,20 @@ for (let i = 0; i < productionOrder.length; i++) {
             left += second
         }
         // 裁剪总耗时
-        c_cutDepartment_list[j].totalWorkSecond = totalWorkSecond
+        c_cutDepartment_list[j].totalWorkSecond = left
     }
+    // console.log("c_cutDepartment_list", c_cutDepartment_list)
     // 按照产能（totalWorkSecond从小到大）排序
-    c_cutDepartment_list = c_cutDepartment_list.filter(e => e.totalWorkSecond).sort((pre, next) => pre.totalWorkSecond - next.totalWorkSecond)
+    c_cutDepartment_list = c_cutDepartment_list.filter(e => e.totalWorkSecond && e.workSecondList).sort((pre, next) => pre.totalWorkSecond - next.totalWorkSecond)
 
     for (let j = 0; j < c_cutDepartment_list.length; j++) {
         // 当前裁剪产线
         let dept = Object.assign(c_cutDepartment_list[j], department.find(e => e.dept_id === c_cutDepartment_list[j].dept_id))
         // 该部门生产力
+        // console.log("dept", dept)
         let deptWorkSecondList = dept.workSecondList.slice(1).concat(dept.workSecondList[0])
+        const currentAttendanceGroup = attendanceGroup.find(item => item.group_id === dept.group_id)
+        const specialOffDuty = currentAttendanceGroup?.specialOffDuty
         // 在该产线上的已有排程
         let c_schedule = schedule.filter(e => e.dept_id === dept.dept_id)
         // 具体到每天有多少usage
@@ -293,9 +344,18 @@ for (let i = 0; i < productionOrder.length; i++) {
         let x_detail = []
 
         // 处理时间大于等于明天时
-        while (cutStartDateObj.str >= tommorow && left > 0) {
+        // console.log(cutStartDateObj.str, tommorow, left)
+        // while (cutStartDateObj.str >= tommorow && left > 0) {
+        while (left > 0) {
             // 当天生产力，看当天是星期几
             let { day, str } = cutStartDateObj
+            // 休息日
+            if (specialOffDuty) {
+                if (specialOffDuty.some(sub => sub.date === str)) {
+                    cutStartDateObj = formatDate(cutStartDateObj.time - 86400000)
+                    continue
+                }
+            }
             let deptWorkSecond = deptWorkSecondList[day - 1]
             // 当天没产能就往前一天再处理
             if (deptWorkSecond === 0) {
@@ -340,15 +400,20 @@ for (let i = 0; i < productionOrder.length; i++) {
                 endDate,
                 x_detail,
                 second: totalWorkSecond,
-                factory_dept_id: dept.factory_dept_id
+                factory_dept_id: dept.factory_dept_id,
+                group_id: dept.group_id
             }
             let cutSchedule = {
+                userNum: userList.filter(item => item.dept_id_list.includes(detail.dept_id)).length,
+                attendanceGroup: attendanceGroup.find(item => item.group_id === detail.group_id),
+                sectionType: "裁剪",
                 endDate: detail.endDate,
                 startDate: detail.startDate,
                 productionOrderId: productionOrder[i].数据ID,
                 orderId: productionOrder[i].orderId,
                 dept_id: detail.dept_id,
                 second: detail.second,
+                factory_dept_id: detail.factory_dept_id,
                 extra: { detail: detail.x_detail }
             }
             productionOrder[i].cacheSchedule.push(cutSchedule)
@@ -357,6 +422,7 @@ for (let i = 0; i < productionOrder.length; i++) {
         }
     }
 }
-console.log("schedule", schedule)
-console.log("productionOrder", productionOrder)
+// console.log("schedule", schedule)
+// console.log("productionOrder", productionOrder)
+productionOrder = productionOrder.map(i => { let o = {}; o.数据ID = i.数据ID; o.cacheSchedule = i.cacheSchedule; o.planEndDate = i.planEndDate; o.planStartDate = i.planStartDate; o.step = 1; o.apsStatus = 4; return o })
 return { result: productionOrder, schedule }

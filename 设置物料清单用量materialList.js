@@ -52,6 +52,7 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
           if (cSizeData) {
             sub.assistAttributeId = cSizeData.assistAttributeId
             sub.assistAttributeIdName = cSizeData.assistAttributeIdName
+            subStyleIngredient[j].size = sub.size
             // dict[cSizeData.assistAttributeId] = cSizeData.size
           }
           return sub
@@ -64,7 +65,7 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         // 物料号
         let code = subStyleIngredientCodeArr[j]
         let arr = subStyleIngredient.filter(e => e.code === code)
-        console.log("arr", arr)
+        // console.log("arr", arr)
         let cCardList = arr.map(e => e.cCard).flat()
         let assistAttributeIdArr = Array.from(new Set(cCardList.map(e => e.assistAttributeId)))
         // 款式配料用量
@@ -78,10 +79,11 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
         
         // cCard = cCard.filter(sub => sub.assistAttributeId)
         // console.log("cCard", cCard)
-        console.log("cCardList", cCardList)
+        // console.log("cCardList", cCardList)
         let result = assistAttributeIdArr.map(sub => {
           if (sub) {
             productNum = cCardList.filter(e => (e.assistAttributeId - 0) === (sub - 0)).reduce((pre, next) => pre + next.number, 0)
+            amount = subStyleIngredient.filter(e => e.code === code && e.size).reduce((pre, next) => pre + next.amount, 0)
           }
           return {
             assistAttributeId: sub,
@@ -104,8 +106,8 @@ for (let i = 0; i < measureBodyStyle.length; i++) {
       for (let j = 0; j < subStyleIngredientCodeArr.length; j++) {
         // 物料号
         let code = subStyleIngredientCodeArr[j]
-        let arr = subStyleIngredient.filter(e => e.code === code)
-        console.log("arr", arr)
+        let arr = subStyleIngredient.filter(e => e.code === code && !e.size)
+        // console.log("arr", arr)
         // 款式配料用量
         let amount = arr.reduce((pre, next) => pre + next.amount, 0)
         // 单位

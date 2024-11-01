@@ -2,13 +2,13 @@
 let nCode = packageTask.code.split(".").slice(-2).join(".")
 let content = boxConfig.content
 let length = content.length
-product = product.map(i => { i.memberId = roster.find(sub => sub.personalMeasureBodyId === i.personalMeasureBodyId).memberId; return i })
-
+product = product.map(i => { i.memberId = roster.find(sub => sub.personalMeasureBodyId === (i.personalMeasureBodyId_1 || i.personalMeasureBodyId)).memberId; return i })
+let index
 // planB
 if (packagePlanType === "B") {
     // ---------package_material_1_code-----------
     // 流水号
-    if (!product[0].boxCode) {
+    if (!product[0].package_material_1_code || product[0].package_material_1_code.split(".").slice(1, 3) !== nCode) {
         index = 0
         for (let i = 0; i < orderPackagePlan.length; i++) {
             let userList = orderPackagePlan[i].userList
@@ -27,13 +27,13 @@ if (packagePlanType === "B") {
     }
 
     // ---------package_material_2_code-----------
-    if (orderPackagePlan.some(i => i.package_material_2) && !product[0].boxCode) {
+    if (orderPackagePlan.some(i => i.package_material_2) && (!product[0].package_material_2_code || product[0].package_material_2_code.split(".").slice(1, 3) !== nCode)) {
         index = 0
         let cacheOrderPackagePlan = orderPackagePlan.filter(i => i.package_material_2)
         let groupIdArr = Array.from(new Set(cacheOrderPackagePlan.map(i => i.groupId)))
         for (let i = 0; i < groupIdArr.length; i++) {
-            let cache = cacheOrderPackagePlan.find(sub => sub.groupId === groupIdArr[i])
-            let userList = cache.userList
+            let cache = cacheOrderPackagePlan.filter(sub => sub.groupId === groupIdArr[i])
+            let userList = cache.map(sub => sub.userList).flat()
             let uuids = cacheOrderPackagePlan.filter(sub => sub.groupId === groupIdArr[i]).map(sub => sub.uuids).flat()
             for (let j = 0; j < userList.length; j++) {
                 index++
@@ -82,6 +82,9 @@ if (packagePlanType === "B") {
                     product.filter(e => e.memberId === specialDog[i] && planList.slice(index, index + num).map(e => e.uuids).flat().includes(e.uuid)).forEach(e => {
                         e.boxMaterialCode = boxMaterialCode;
                         e.boxCode = boxCode;
+                        e.address = member.address;
+                        e.contact = member.contact;
+                        e.receiver = member.receiver;
                     })
                     index += num
                 }
@@ -91,6 +94,9 @@ if (packagePlanType === "B") {
                 product.filter(e => e.memberId === specialDog[i] && planList.slice(-left).map(e => e.uuids).flat().includes(e.uuid)).forEach(e => {
                     e.boxCode = boxCode;
                     e.boxMaterialCode = content.slice(-1)[0].materialCode;
+                    e.address = member.address;
+                    e.contact = member.contact;
+                    e.receiver = member.receiver;
                 })
             }
         }
@@ -115,7 +121,9 @@ if (packagePlanType === "B") {
         }
         // 都有发货地址则继续
         for (let i = 0; i < addressList.length; i++) {
-            let userList = departmentDog.filter(e => e.addressId === addressList[i]).map(e => e.memberId)
+            let addressId = addressList[i]
+            let departmentAddress = customerDepartmentAddress.find(e => e.数据ID === addressId)
+            let userList = departmentDog.filter(e => e.addressId === addressId).map(e => e.memberId)
             // [{memberId, planId}]
             let loopList = orderPackagePlan.filter(e => e.userList.some(sub => userList.includes(sub))).map(e => {
                 let uList = e.userList.filter(sub => userList.includes(sub))
@@ -148,6 +156,9 @@ if (packagePlanType === "B") {
                     product.filter(e => cList.some(sub => sub.memberId === e.memberId) && uuids.includes(e.uuid)).forEach(e => {
                         e.boxMaterialCode = boxMaterialCode;
                         e.boxCode = boxCode;
+                        e.contact = departmentAddress.phone;
+                        e.receiver = departmentAddress.receiver;
+                        e.address = departmentAddress.address;
                     })
                     index += num
                 }
@@ -159,6 +170,9 @@ if (packagePlanType === "B") {
                 product.filter(e => cList.some(sub => sub.memberId === e.memberId) && uuids.includes(e.uuid)).forEach(e => {
                     e.boxCode = boxCode;
                     e.boxMaterialCode = content.slice(-1)[0].materialCode;
+                    e.contact = departmentAddress.phone;
+                    e.receiver = departmentAddress.receiver;
+                    e.address = departmentAddress.address;
                 })
             }
         }
@@ -168,7 +182,7 @@ if (packagePlanType === "B") {
 if (packagePlanType === "C") {
     // ---------package_material_1_code_C-----------
     // 流水号
-    if (!product[0].boxCode_C) {
+    if (!product[0].package_material_1_code_C || product[0].package_material_1_code_C.split(".").slice(1, 3) !== nCode) {
         index = 0
         for (let i = 0; i < orderPackagePlan.length; i++) {
             let userList = orderPackagePlan[i].userList
@@ -180,20 +194,20 @@ if (packagePlanType === "C") {
                         e.package_material_1_code_C = package_material_1_code_C;
                         e.package_material_1_C = orderPackagePlan[i].package_material_1
                     }
-                    e.package_material_categroyId = orderPackagePlan[i].package_material_categroyId
+                    e.package_material_categroyId_C = orderPackagePlan[i].package_material_categroyId
                 })
             }
         }
     }
 
     // ---------package_material_2_code-----------
-    if (orderPackagePlan.some(i => i.package_material_2) && !product[0].boxCode_C) {
+    if (orderPackagePlan.some(i => i.package_material_2) && (!product[0].package_material_2_code_C || product[0].package_material_2_code_C.split(".").slice(1, 3) !== nCode)) {
         index = 0
         let cacheOrderPackagePlan = orderPackagePlan.filter(i => i.package_material_2)
         let groupIdArr = Array.from(new Set(cacheOrderPackagePlan.map(i => i.groupId)))
         for (let i = 0; i < groupIdArr.length; i++) {
-            let cache = cacheOrderPackagePlan.find(sub => sub.groupId === groupIdArr[i])
-            let userList = cache.userList
+            let cache = cacheOrderPackagePlan.filter(sub => sub.groupId === groupIdArr[i])
+            let userList = cache.map(sub => sub.userList).flat()
             let uuids = cacheOrderPackagePlan.filter(sub => sub.groupId === groupIdArr[i]).map(sub => sub.uuids).flat()
             for (let j = 0; j < userList.length; j++) {
                 index++
@@ -213,6 +227,7 @@ if (packagePlanType === "C") {
     // 所有用户
     let totalUserList = Array.from(new Set(orderPackagePlan.map(i => i.userList).flat()))
     // 没有单独发货的人
+    let specialDog = roster.filter(i => i.separateShip).map(i => i.memberId)
     let leftUserList = totalUserList.filter(i => !specialDog.includes(i))
     if (leftUserList.length) {
         let departmentDog = roster.filter(i => customerDepartmentAddress.some(sub => sub.departmentIds.includes(i.departmentId)) && !specialDog.includes(i.memberId)).map(i => {
@@ -228,7 +243,9 @@ if (packagePlanType === "C") {
         }
         // 都有发货地址则继续
         for (let i = 0; i < addressList.length; i++) {
-            let userList = departmentDog.filter(e => e.addressId === addressList[i]).map(e => e.memberId)
+            let addressId = addressList[i]
+            let departmentAddress = customerDepartmentAddress.find(e => e.数据ID === addressId)
+            let userList = departmentDog.filter(e => e.addressId === addressId).map(e => e.memberId)
             // [{memberId, planId}]
             let loopList = orderPackagePlan.filter(e => e.userList.some(sub => userList.includes(sub))).map(e => {
                 let uList = e.userList.filter(sub => userList.includes(sub))
@@ -261,6 +278,9 @@ if (packagePlanType === "C") {
                     product.filter(e => cList.some(sub => sub.memberId === e.memberId) && uuids.includes(e.uuid)).forEach(e => {
                         e.boxMaterialCode_C = boxMaterialCode_C;
                         e.boxCode_C = boxCode_C;
+                        e.contact_C = departmentAddress.phone;
+                        e.receiver_C = departmentAddress.receiver;
+                        e.address_C = departmentAddress.address;
                     })
                     index += num
                 }
@@ -272,6 +292,9 @@ if (packagePlanType === "C") {
                 product.filter(e => cList.some(sub => sub.memberId === e.memberId) && uuids.includes(e.uuid)).forEach(e => {
                     e.boxCode_C = boxCode_C;
                     e.boxMaterialCode_C = content.slice(-1)[0].materialCode;
+                    e.contact_C = departmentAddress.phone;
+                    e.receiver_C = departmentAddress.receiver;
+                    e.address_C = departmentAddress.address;
                 })
             }
         }
