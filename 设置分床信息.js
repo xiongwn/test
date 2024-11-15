@@ -22,13 +22,13 @@ for (let i = 0; i < bedList.length; i++) {
     e.result.some((sub) => sub.bedIndex === currentBedIndex)
   );
   let bedId = i + 1;
-  let c_product = cacheBedConfig.result
+  let c_product = cacheBedConfig.result.sort((pre, next) => pre.rowIndex - next.rowIndex)
     .filter((sub) => sub.bedIndex === currentBedIndex)
     .map((e) => {
-      e.serialNum = serialNum++
-      // if (serialNum + 1 - staticSerialNum <= product.length) {
-      //   e.serialNum = serialNum++
-      // }
+      // e.serialNum = serialNum++
+      if (serialNum + 1 - staticSerialNum <= product.length) {
+        e.serialNum = serialNum++
+      }
       e.bedId = bedId;
       return Object.assign(
         product.find((item) => item.uuid === e.uuid),
@@ -166,4 +166,4 @@ product.forEach((item) => {
 });
 // ---------------------
 return { result, product, productResult };
-//console.log({result, product, productResult})
+// console.log({result, product, productResult})

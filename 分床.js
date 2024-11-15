@@ -96,6 +96,7 @@ if (!colorDiff) {
           pre[next] = product.filter(e => e.groupUnicId === next)
           return pre
       }, {})
+    //   console.log("groupMap", Object.entries(groupMap))
   
       while (Object.values(groupMap).some(e => e.length)) {
           // 按每组剩余衣服给各组排序
@@ -258,5 +259,5 @@ if (!colorDiff) {
           bedIndex += bedIndexSize
       }
   }
-  // console.log({ result: bedConfig, product })
-  return { result: bedConfig, product }
+  console.log({ result: bedConfig, product })
+//   return { result: bedConfig, product }
